@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AURA Live</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/chat.css" />
+  </head>
+  <body class="page-chat">
+    <div class="scene-bg" aria-hidden="true">
+      <div id="dynamicBg" class="dynamic-bg"></div>
+      <div class="bg-scrim"></div>
+      <div class="bg-vignette"></div>
+      <div class="bg-noise"></div>
+    </div>
+
+    <button id="settingsFab" class="settings-fab" type="button" aria-label="打开外观和设置入口">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M10.325 4.317a1.75 1.75 0 0 1 3.35 0 1.75 1.75 0 0 0 2.574 1.066 1.75 1.75 0 0 1 2.37 2.37 1.75 1.75 0 0 0 1.065 2.573 1.75 1.75 0 0 1 0 3.35 1.75 1.75 0 0 0-1.066 2.573 1.75 1.75 0 0 1-2.37 2.37 1.75 1.75 0 0 0-2.572 1.065 1.75 1.75 0 0 1-3.35 0 1.75 1.75 0 0 0-2.573-1.066 1.75 1.75 0 0 1-2.37-2.37 1.75 1.75 0 0 0-1.065-2.572 1.75 1.75 0 0 1 0-3.35 1.75 1.75 0 0 0 1.066-2.573 1.75 1.75 0 0 1 2.37-2.37 1.75 1.75 0 0 0 2.572-1.065Z"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+
+    <section id="quickSettings" class="quick-settings hidden" aria-hidden="true">
+      <div class="quick-settings-head">
+        <strong>外观</strong>
+        <button id="closeQuickSettingsBtn" class="quick-close" type="button" aria-label="关闭">
+          ×
+        </button>
+      </div>
+
+      <label class="quick-field">
+        <span>背景图片 URL</span>
+        <input id="backgroundInput" type="url" placeholder="输入图片链接后应用" />
+      </label>
+
+      <div id="backgroundPresets" class="bg-presets" aria-label="背景预设"></div>
+
+      <div class="quick-settings-actions">
+        <button id="applyBackgroundBtn" class="quick-action primary" type="button">应用背景</button>
+        <a class="quick-action" href="/settings">配置中心</a>
+      </div>
+    </section>
+
+    <div class="chat-viewport">
+      <div id="chatLayout" class="chat-layout">
+        <aside class="pet-lane" aria-hidden="true"></aside>
+
+        <main class="chat-window">
+          <section class="chat-window-shell">
+            <header class="chat-header">
+              <div class="chat-identity">
+                <span class="presence-dot" aria-hidden="true"></span>
+                <div class="chat-identity-copy">
+                  <h1 id="heroTitle">AURA</h1>
+                  <span id="heroStatus">在线陪伴</span>
+                </div>
+              </div>
+
+              <div class="chat-header-meta">
+                <span id="healthBadge" class="glass-pill status-pill status-offline">Ollama 未连接</span>
+                <span id="memoryBadge" class="glass-pill status-pill">记忆 0</span>
+                <span id="runtimeModel" class="glass-pill status-pill">Gemma4:e4b</span>
+              </div>
+            </header>
+
+            <section class="chat-surface">
+              <div id="notice" class="notice" hidden></div>
+
+              <section id="messageList" class="message-list" aria-live="polite"></section>
+
+              <footer class="composer-shell">
+                <form id="chatForm" class="composer-form">
+                  <textarea
+                    id="chatInput"
+                    rows="1"
+                    maxlength="1000"
+                    placeholder="与它说点什么..."
+                    aria-label="输入消息"
+                    required
+                  ></textarea>
+                  <button id="sendButton" class="send-button" type="submit" aria-label="发送消息">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="m11.5 12.5 8.5-8.5M12 13l6 7 2-16-16 2 7 6Z"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </form>
+              </footer>
+            </section>
+          </section>
+        </main>
+
+        <aside id="petCard" class="pet-avatar-card" aria-label="宠物展示卡">
+          <button id="petHandle" class="pet-drag-handle" type="button" aria-label="拖动宠物卡">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <div class="pet-card-frame">
+            <img id="petFloatImage" alt="Pet portrait" hidden />
+            <div id="petFloatFallback" class="pet-fallback">A</div>
+          </div>
+
+          <div class="pet-card-footer">
+            <strong id="petFloatName">AURA</strong>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <template id="messageTemplate">
+      <article class="message-bubble">
+        <div class="message-actions" aria-hidden="true">
+          <button class="message-regenerate" type="button" aria-label="重新生成最新回复">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M20 11a8 8 0 1 0 2 5.291"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M20 4v7h-7"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

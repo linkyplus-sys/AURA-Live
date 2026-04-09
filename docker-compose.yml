@@ -1,0 +1,16 @@
+services:
+  aura-live:
+    build:
+      context: /vol1/1000/docker/ai_pet
+    container_name: aura-live
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      OLLAMA_BASE_URL: "http://192.168.50.51:11434"
+      DEFAULT_MODEL: "Gemma4:e4b"
+      EMBED_MODEL: "bge-m3"
+      APP_TITLE: "AURA Live"
+      REQUEST_TIMEOUT: "60"
+    volumes:
+      - /vol1/1000/docker/ai_pet:/app

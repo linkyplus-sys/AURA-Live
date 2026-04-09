@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AURA Memories</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="page-settings page-memories">
+    <div class="backdrop">
+      <div class="blur-orb orb-copper"></div>
+      <div class="blur-orb orb-sea"></div>
+      <div class="grain"></div>
+    </div>
+
+    <main class="settings-shell memories-shell">
+      <header class="settings-header">
+        <div>
+          <p class="eyebrow">Memories</p>
+          <h1>长期记忆列表</h1>
+          <p class="muted">查看当前已经进入长期记忆库的条目。</p>
+        </div>
+        <div class="settings-header-actions">
+          <a class="button button-ghost" href="/settings">返回设置</a>
+          <a class="button button-ghost" href="/">返回聊天</a>
+        </div>
+      </header>
+
+      <div id="notice" class="notice" hidden></div>
+
+      <section class="memories-layout">
+        <article class="panel memories-panel">
+          <div class="memories-toolbar">
+            <div class="memories-toolbar-copy">
+              <p class="eyebrow">Library</p>
+              <h2 id="memoryCountText">记忆 0</h2>
+              <p id="memoryUpdatedText" class="muted">尚未加载</p>
+            </div>
+
+            <button id="refreshMemoriesBtn" class="button button-primary" type="button">
+              刷新列表
+            </button>
+          </div>
+
+          <section id="memoriesList" class="memories-list"></section>
+        </article>
+      </section>
+    </main>
+
+    <template id="memoryItemTemplate">
+      <article class="memory-item">
+        <header class="memory-item-head">
+          <div class="memory-badges">
+            <span class="status-pill memory-category">general</span>
+            <span class="status-pill memory-score">score 0</span>
+          </div>
+          <time class="memory-time"></time>
+        </header>
+
+        <p class="memory-summary"></p>
+        <small class="memory-key"></small>
+
+        <div class="memory-detail-grid">
+          <section class="memory-detail" data-field="user_memory">
+            <strong>用户关键信息</strong>
+            <p></p>
+          </section>
+          <section class="memory-detail" data-field="bot_memory">
+            <strong>助手上下文</strong>
+            <p></p>
+          </section>
+          <section class="memory-detail" data-field="user_text">
+            <strong>用户原话</strong>
+            <p></p>
+          </section>
+          <section class="memory-detail" data-field="bot_text">
+            <strong>助手原话</strong>
+            <p></p>
+          </section>
+        </div>
+      </article>
+    </template>
+
+    <script src="/static/memories.js" defer></script>
+  </body>
+</html>
