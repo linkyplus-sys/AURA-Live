@@ -1,133 +1,192 @@
-## 1. 项目概述
-
-AURA-Live 是一个运行在本地或 NAS 环境中的 AI char互动应用，可用于“蒸馏同事”。当前版本采用 `FastAPI + 原生 HTML/CSS/JS + Ollama + ChromaDB` 架构，目标是提供一个可定制人格、可持续记忆、可本地部署的沉浸式聊天界面。
-
-当前实现已经包含以下能力：
-
-- 本地流式聊天
-- 可配置的人格、表达风格、环境背景和头像
-- 关键词触发式世界书
-- 长期记忆提取、向量存储、召回与查看
-- 最新一条 AI 回复的“重新生成”
-- 可切换的 Ollama 服务地址与当前模型
-- 可拖动的形象展示卡片
-- 可更换的页面背景
-- Docker / Docker Compose 部署
+# AURA-Live：单用户本地陪伴系统开发技术文档 (v1.1)
+> 更新时间：2026-04-10
+> 文档状态：已按当前仓库实现重写并对齐
+> 适用版本：当前工作区代码
+> 项目属性：单用户、本地部署、NAS 常驻优先
 
 ---
 
-## 2. 当前功能清单
+## 1. 项目定位
+
+AURA-Live 当前不是一个泛化的“多用户聊天平台”，而是一个面向单用户、本地或 NAS 部署的陪伴式角色聊天系统。
+
+当前实现采用 `FastAPI + 原生 HTML/CSS/JS + Ollama / OpenAI-compatible 接口 + ChromaDB` 架构，目标是提供：
+
+- 单用户长期陪伴
+- 角色人格与世界书可编辑
+- 长期记忆与会话记忆并存
+- 最近状态连续承接
+- 删除 / 回滚后记忆可同步修正
+- 适合本地电脑或 NAS 常驻运行
+
+当前明确不以这些目标为优先：
+
+- 多用户账号体系
+- SaaS 化权限与租户隔离
+- 高并发公网服务
+- 部署路径和数据卷的强可移植抽象
+
+---
+
+## 2. 当前已实现能力
 
 ### 2.1 聊天页 `/`
 
-聊天页是当前应用的主入口，包含以下特性：
+聊天页是主入口，当前已经实现：
 
-- 固定尺寸的沉浸式聊天窗口
-- 消息区独立滚动，输入框固定在底部
+- SSE 流式聊天
 - `Enter` 发送，`Shift + Enter` 换行
-- SSE 流式输出助手回复
-- 聊天气泡支持轻量 Markdown 渲染
-- 括号中的动作、神态、环境描写按斜体动作段处理
-- 动作描写统一使用第三人称视角
-- 右上角快捷设置入口，可快速切换背景图
-- 左侧可拖动 3:4 形象展示卡片
-- 最新一条助手消息支持悬浮显示“重新生成”按钮
+- 用户输入支持“动作 + 台词”混合表达
+- 动作括号统一规范为中文全角 `（）`
+- 助手动作自动规范为第三人称视角
+- 每条助手消息可删除整轮对话
+- 最新一条助手消息可重新生成
+- 顶部展示运行状态、记忆数量、当前模型
+- 悬浮外观入口，可快速切换背景 URL 或预设背景
+- 3:4 比例悬浮立绘，整张立绘可直接拖动
+- 立绘已去除边框、底部文字和拖拽把手，改为更强存在感的呼吸式展示
+- 用户消息气泡已改为一体化非对称圆角轮廓，避免主块和尾巴割裂
+- 背景与立绘偏移量保存在浏览器本地存储
 
 ### 2.2 设置页 `/settings`
 
-设置页负责管理运行配置和内容配置，当前包含：
+设置页当前负责：
 
-- `Soul` 人格配置
+- 人格配置
   - 名称
-  - 性格描述
+  - 性格 / 人格描述
   - 表达风格
-  - 当前环境与背景描述
-  - 头像文件名
-- `Worldbook` 世界书表单编辑
+  - 当前环境与背景
+  - 立绘文件名
+  - 立绘上传
+- 世界书配置
+  - 新增 / 删除条目
   - 标题
   - 关键词
   - 内容
   - 是否总是加载
-- `Runtime` 运行配置
-  - Ollama 服务地址
-  - 当前模型选择
-  - Ollama 在线状态
-  - 历史消息数量
-  - 长期记忆数量
-- 运维操作
-  - 清空对话历史
-  - 清空记忆库
-  - 跳转到记忆查看页
+- 运行时配置
+  - Provider 切换
+  - 服务地址
+  - API Key
+  - 对话模型
+  - 嵌入模型
+  - 可用模型读取
+  - 当前运行状态展示
+- 维护操作
+  - 清空历史
+  - 清空记忆
+  - 跳转记忆页
 
 ### 2.3 记忆页 `/memories`
 
-记忆页用于查看当前长期记忆库中的内容，当前展示：
+记忆页当前已经实现：
 
-- 记忆分类
-- 记忆分数
+- 记忆列表查看
+- `persistent / session` 范围筛选
+- 分类筛选
+- 摘要 / key / 原话搜索
+- 筛选条件持久化到浏览器 `localStorage`
+- 单条记忆删除
+- 刷新列表
+
+页面展示字段包括：
+
+- 范围 `scope`
+- 分类 `category`
+- 分数 `score`
 - 更新时间
-- 记忆摘要
-- 用户关键信息
-- 助手上下文信息
-- 用户原话
-- 助手原话
+- 摘要 `summary`
+- 记忆键 `key`
+- 用户关键信息 `user_memory`
+- 助手上下文 `bot_memory`
+- 用户原话 `user_text`
+- 助手原话 `bot_text`
+
+### 2.4 后端能力
+
+后端当前已经实现：
+
+- 聊天历史保存
+- 世界书按关键词触发
+- 长期记忆与会话记忆召回
+- 角色连续性提示词构建
+- 最近重复动作 / 特征的保守抑制
+- 最新回复重新生成
+- 整轮删除与记忆引用回滚
+- 单条记忆删除
+- 本地 Ollama 与在线兼容接口切换
 
 ---
 
-## 3. 当前技术架构
-
-### 3.1 技术栈
+## 3. 技术栈
 
 - 后端：`FastAPI`
-- 前端：`原生 HTML / CSS / JavaScript`
-- 模型服务：`Ollama`
-- 记忆存储：`ChromaDB`
-- 语言：`Python 3.10+`
+- 前端：`HTML + CSS + JavaScript`
+- 大模型接口：`Ollama`、`OpenAI-compatible HTTP API`
+- 向量数据库：`ChromaDB`
+- 运行语言：`Python 3.10+`
 - 服务启动：`uvicorn`
 - 容器部署：`Docker / Docker Compose`
 
-### 3.2 模块分层
+---
+
+## 4. 当前架构
 
 ```text
 Browser
-  ├─ /                  聊天页
-  ├─ /settings          设置页
-  ├─ /memories          记忆查看页
-  └─ /static/*          静态资源
+  ├─ /
+  ├─ /settings
+  ├─ /memories
+  ├─ /static/*
+  └─ /avatars/*
 
 FastAPI (app.py)
   ├─ 页面路由
-  ├─ 配置接口
-  ├─ 聊天 SSE 接口
-  ├─ 重新生成接口
-  └─ 记忆列表接口
+  ├─ bootstrap / health / history / memory API
+  ├─ 角色、世界书、运行时配置 API
+  ├─ 流式聊天与重新生成 API
+  └─ 头像上传 API
 
 ChatService (services/chat_service.py)
-  ├─ 加载 soul / worldbook / history / runtime
-  ├─ 构建 prompt
-  ├─ 世界书触发
+  ├─ 读取 soul / worldbook / runtime / history
+  ├─ 规范化输入动作括号
+  ├─ 构建系统提示词
+  ├─ 注入世界书与记忆
+  ├─ 生成连续性约束
   ├─ 调用 LLMClient
-  ├─ 保存历史
+  ├─ 规范化助手动作第三人称
+  ├─ 抑制最近重复动作标记
+  ├─ 写入历史
   ├─ 写入记忆
-  └─ 处理重新生成
+  ├─ 删除整轮对话
+  └─ 重新生成失败时恢复原轮次
+
+Parser (utils/parser.py)
+  ├─ 统一中英文括号
+  ├─ 提取动作段
+  ├─ 拆分动作与台词
+  ├─ 格式化用户输入
+  └─ 规范化动作视角
 
 LLMClient (models/llm.py)
-  ├─ /api/tags
-  ├─ /api/chat
-  ├─ /api/embeddings
-  └─ /api/embed
+  ├─ Provider 统一封装
+  ├─ 模型列表读取
+  ├─ 流式聊天
+  └─ 文本向量化
 
 MemoryManager (models/memory.py)
-  ├─ 记忆提取
-  ├─ 向量写入
-  ├─ 去重与合并
-  ├─ 相似度召回
-  └─ 记忆列表读取
+  ├─ LLM 提取 + 规则兜底
+  ├─ persistent / session 分类
+  ├─ 记忆压缩、合并、覆盖
+  ├─ turn_id 引用管理
+  ├─ 召回与新鲜度控制
+  └─ 记忆删除与回滚
 ```
 
 ---
 
-## 4. 当前目录结构
+## 5. 当前目录结构
 
 ```text
 /ai_pet/
@@ -156,46 +215,57 @@ MemoryManager (models/memory.py)
 │  ├─ file_ops.py
 │  ├─ parser.py
 │  └─ validators.py
-└─ static/
-   ├─ index.html
-   ├─ app.js
-   ├─ chat.css
-   ├─ settings.html
-   ├─ settings.js
-   ├─ memories.html
-   ├─ memories.js
-   └─ styles.css
+├─ static/
+│  ├─ index.html
+│  ├─ app.js
+│  ├─ chat.css
+│  ├─ settings.html
+│  ├─ settings.js
+│  ├─ memories.html
+│  ├─ memories.js
+│  └─ styles.css
+└─ tests/
+   └─ test_chat_service_turn_management.py
 ```
 
 ---
 
-## 5. 核心数据文件
+## 6. 核心数据文件
 
-### 5.1 `soul.json`
+### 6.1 `soul.json`
 
-用于定义 AI 人格和外观。当前字段：
+角色配置文件，当前字段如下：
 
 ```json
 {
   "name": "AURA",
-  "personality": "人格描述",
-  "style": "表达风格",
-  "scene": "当前环境与背景",
+  "personality": "温柔、清醒，带一点陪伴感的数字宠物。",
+  "style": "如果需要动作或环境描写，请写在括号()里。",
+  "scene": "",
   "pet_image": "bot.png"
 }
 ```
 
-### 5.2 `worldbook.json`
+说明：
 
-用于定义世界书。当前推荐格式为 `entries` 数组，每条世界书支持关键词触发和常驻注入：
+- `pet_image` 是当前实现中的遗留字段名
+- 当前语义按“角色立绘文件名”解释
+- `load_soul()` 没有做进程内缓存，聊天和设置读取时都会直接从 `soul.json` 载入
+- 因此在 NAS 后台直接整份替换 `soul.json` 可以快速切换角色设定，通常不需要重启服务
+- 但如果设置页已经打开并再次保存，会以当前表单内容覆盖文件，因此手工替换后应避免用旧页面状态再次提交
+- 手工替换时需要保持字段结构完整，至少应包含 `name` 和 `personality`
+
+### 6.2 `worldbook.json`
+
+当前推荐保存为 `entries` 数组：
 
 ```json
 {
   "entries": [
     {
-      "title": "AURA 身份",
-      "keywords": ["AURA", "身份", "你是谁"],
-      "content": "AURA 是一个运行在本地环境中的 AI char。",
+      "title": "身份设定",
+      "keywords": ["身份", "设定"],
+      "content": "AURA 是一个运行在本地环境中的 AI 宠物助手。",
       "always": false
     }
   ]
@@ -204,24 +274,37 @@ MemoryManager (models/memory.py)
 
 说明：
 
-- `keywords` 命中时加载进 prompt
-- `always: true` 时每轮都加载
-- 当前设置页使用表单编辑世界书，再保存为该格式
+- 命中 `keywords` 时注入
+- `always: true` 的条目每轮注入
+- 代码仍兼容旧的字典映射格式，但设置页保存为 `entries` 结构
+- 后端当前也兼容“根节点直接是数组”的世界书文件，保存时会统一标准化成 `{"entries":[...]}` 结构
+- `load_worldbook()` 没有做进程内缓存，聊天和设置读取时都会直接从 `worldbook.json` 载入
+- 因此在 NAS 后台直接整份替换 `worldbook.json` 可以达到快速批量增条目的效果，通常不需要重启服务
+- 但如果设置页已经打开并再次保存，会以当前表单内容覆盖文件，因此手工替换后应避免用旧页面状态再次提交
 
-### 5.3 `history.json`
+### 6.3 `history.json`
 
-保存完整对话历史。每条记录包含：
+保存完整对话历史，当前每条消息是：
 
 ```json
 {
-  "role": "user",
-  "content": "消息内容"
+  "role": "assistant",
+  "content": "（AURA坐在窗边）那就继续聊吧。",
+  "turn_id": "turn-3-abcd1234",
+  "turn_index": 3
 }
 ```
 
-### 5.4 `memory.json`
+说明：
 
-当前是记忆基础配置文件，占位用途为主：
+- `content` 保存归一化后的文本
+- 动作括号统一成中文全角 `（）`
+- `turn_id` 用于记忆回滚与整轮删除
+- `turn_index` 用于会话状态和新鲜度判断
+
+### 6.4 `memory.json`
+
+这是基础配置文件，不是记忆正文：
 
 ```json
 {
@@ -231,428 +314,406 @@ MemoryManager (models/memory.py)
 }
 ```
 
-### 5.5 `runtime.json`
+### 6.5 `runtime.json`
 
-保存当前运行时配置：
+运行时模型配置文件：
 
 ```json
 {
+  "provider": "ollama",
   "base_url": "http://192.168.50.51:11434",
-  "current_model": "Gemma4:e4b"
+  "api_key": "",
+  "current_model": "Gemma4:e4b",
+  "embed_model": "bge-m3"
 }
 ```
 
-### 5.6 `chroma_db/`
+说明：
 
-长期记忆的真实存储位置。`memory.json` 不是记忆内容本体，真实记忆数据保存在 `chroma_db` 下的 Chroma 持久化库中。
+- 设置页只会对已保存 Key 做掩码展示
+- `runtime.json` 中保存的是原始值，当前实现默认接受这种单用户本地存储方式
 
----
+### 6.6 `chroma_db/`
 
-## 6. 当前运行配置
+真实记忆数据的持久化目录。  
+`memory.json` 不是记忆本体，长期记忆和会话记忆实际保存在 `chroma_db` 中。
 
-`config.py` 当前支持的关键环境变量如下：
+### 6.7 `avatars/`
 
-| 配置项 | 默认值 | 说明 |
-| --- | --- | --- |
-| `OLLAMA_BASE_URL` | `http://192.168.50.51:11434` | Ollama 服务地址 |
-| `DEFAULT_MODEL` | `Gemma4:e4b` | 默认对话模型 |
-| `EMBED_MODEL` | `bge-m3` | 默认嵌入模型 |
-| `REQUEST_TIMEOUT` | `60` | 请求超时时间 |
-| `MAX_RETRIES` | `3` | HTTP 重试次数 |
-| `RETRY_DELAY` | `1.0` | 初始重试间隔 |
-| `CHROMA_DB_PATH` | `chroma_db` | 记忆数据库目录 |
-| `MEMORY_COLLECTION` | `pet_memory` | 记忆集合名 |
-| `MEMORY_RECALL_COUNT` | `3` | 每轮召回记忆条数 |
-| `MEMORY_SIMILARITY_THRESHOLD` | `0.58` | 记忆召回相似度阈值 |
-| `MAX_INPUT_LENGTH` | `1000` | 单轮输入上限 |
-| `HISTORY_WINDOW` | `12` | 进入 prompt 的最近历史窗口 |
+立绘上传目录，文件通过 `/avatars/<filename>` 对外提供访问。
 
 ---
 
-## 7. 当前对话工作流
+## 7. 系统提示词与连续性机制
 
-### 7.1 聊天主流程
+当前系统提示词由这些部分组成：
 
-每轮对话的当前执行流程为：
-
-```text
-用户输入
-  -> 输入清理与长度校验
-  -> 读取 soul / worldbook / history / runtime
-  -> 用当前输入召回长期记忆
-  -> 用“最近 4 条历史 + 当前输入”触发世界书
-  -> 组装 system prompt
-  -> 调用 Ollama 流式生成
-  -> 规范括号中的动作描写为第三人称
-  -> 保存 history.json
-  -> 提取并写入长期记忆
-  -> 返回前端并更新运行状态
-```
-
-### 7.2 系统 Prompt 组成
-
-当前 `system prompt` 由以下部分动态拼装：
-
-- 人格定义
+- 角色人格
 - 表达风格
 - 当前环境与背景
-- 命中的世界书条目
-- 召回到的长期记忆
+- 世界书注入内容
+- 记忆召回内容
+- 连续性约束
 - 回复规则
 
-回复规则当前明确要求：
+### 7.1 连续性约束
 
-- 自然、简洁、有陪伴感
-- 不自称语言模型或系统
-- 动作、神态、环境描写写在括号中
-- 括号内动作统一使用第三人称描述char
+`ChatService.build_system_prompt()` 当前会根据最近历史生成 `【连续性约束】`，核心目标是：
 
-### 7.3 最新回复重新生成
+- 默认延续上一轮仍然有效的关系、距离感、情绪和场景
+- 避免每轮都重新起一个完全无关的新状态
+- 避免角色反复复述相同衣着、姿势、动作、神态或场景
+- 优先回应用户的新输入，而不是反复做同一段描写
 
-当前已经支持“重新生成最新一条助手回复”：
+### 7.2 重复动作抑制
 
-- 仅对最新一条助手消息显示按钮
-- 按钮默认隐藏，鼠标悬停时显示
-- 点击后会先移除最新一轮对话，再重新生成
-- 若后端生成失败，会回滚原有历史
+除了提示词约束，当前还存在一层保守后处理：
 
----
-
-## 8. 当前世界书机制
-
-世界书现在不是整本常驻 prompt，而是关键词触发加载。
-
-### 8.1 触发规则
-
-- 触发文本来源：`最近 4 条历史 + 当前输入`
-- 逐条检查 `keywords`
-- 命中后把对应条目加入 `【世界书】`
-- `always: true` 的条目每轮必定注入
-
-### 8.2 设置页编辑行为
-
-设置页当前使用表单式世界书编辑器，不需要手写 JSON。每条记录包含：
-
-- 标题
-- 关键词
-- 内容
-- 是否总是加载
-
-保存时会统一写回 `worldbook.json`。
+- 会分析最近几轮助手输出中的重复动作标记
+- 会对“仍坐在窗边 / 依旧坐在窗边 / 继续坐在窗边”这类轻变体做归一化
+- 只在删除后仍保留有效内容时才移除重复动作段
+- 当前抑制重点是动作括号段，不是完整语义级重写
 
 ---
 
-## 9. 当前记忆机制
+## 8. 对话、删除与回滚工作流
 
-### 9.1 存储位置
+### 8.1 普通聊天流程
 
-- 聊天历史：`history.json`
-- 长期记忆：`chroma_db/`
-- 记忆基础配置：`memory.json`
+1. 前端提交用户输入
+2. 后端做清洗与长度限制
+3. 统一半角括号到全角 `（）`
+4. 将用户输入拆成 `【用户动作】` / `【用户台词】`
+5. 读取最近历史
+6. 基于最近历史和当前输入触发世界书
+7. 召回长期记忆和会话记忆
+8. 构建系统提示词与连续性约束
+9. 调用当前模型流式生成
+10. 将助手动作改写为第三人称
+11. 对最近重复动作做保守抑制
+12. 保存 `history.json`
+13. 触发记忆提取、压缩、合并和写入
 
-### 9.2 当前记忆提取策略
+### 8.2 重新生成流程
 
-当前记忆系统会同时处理两类内容：
+`POST /api/chat/regenerate` 当前流程是：
 
-#### 用户高价值记忆
+1. 找到最新一组 `user -> assistant` 轮次
+2. 暂时从历史中移除这一轮
+3. 同步移除该轮次相关记忆引用
+4. 以原用户输入重新调用聊天
+5. 如果重新生成失败，则恢复原轮次并补写原记忆
 
-优先提取以下信息：
+### 8.3 整轮删除流程
 
-- 名称
-- 称呼偏好
-- 所在地
-- 来源
-- 职业
-- 喜好 / 厌恶
-- 习惯
-- 计划
-- 近期状态
-- 互动边界
+聊天页点击助手消息上的删除按钮时：
 
-低价值寒暄不会写入，例如：
+1. 前端调用 `DELETE /api/history/turn`
+2. 后端按 `turn_id` 或 `turn_index` 删除整轮消息
+3. 同步移除该轮次的记忆引用
+4. 返回更新后的历史与记忆数量
 
-- 你好
-- 谢谢
-- 哈哈
-- 再见
+### 8.4 前端流式收尾
 
-#### 助手上下文记忆
-
-会额外提取char的上下文状态：
-
-- 当前衣着
-- 当前动作
-- 当前场景
-
-这使得像“穿着什么”“刚才做了什么”“现在处于什么环境”这类上下文更容易被保留下来。
-
-### 9.3 当前记忆去重与合并
-
-当前记忆不是无限堆积，写入时会做三层控制：
-
-- `user_text + bot_text` 哈希去重
-- 同类记忆按 `memory_key` 合并
-- 相似候选记忆按相似度进一步合并
-
-因此：
-
-- 重复内容不会不断增长
-- 同类状态会被更新而不是无止境新增
-
-### 9.4 当前记忆召回
-
-当前召回策略为：
-
-- 使用用户当前输入进行向量检索
-- 默认召回 `3` 条
-- 先取候选，再用相似度阈值过滤
-- 阈值默认为 `0.58`
-- 若没有命中但最相近结果足够接近，会回退保留 1 条
-
-召回后的内容会进入 `【长期记忆】` 段落参与回复生成。
-
-### 9.5 当前记忆查看
-
-当前支持独立记忆查看页 `/memories`，可以查看：
-
-- 分类
-- 分数
-- 时间
-- 摘要
-- 用户关键信息
-- 助手上下文
-- 原始对话
+前端在 SSE `done` 事件到达时，会用后端返回的最终历史覆盖流式占位消息。  
+这样可以保证用户最终看到的内容，与后端保存到 `history.json` 的内容一致。
 
 ---
 
-## 10. 当前前端实现说明
+## 9. 世界书机制
 
-### 10.1 聊天页前端
+当前世界书采用“关键词触发 + 可选常驻”机制。
 
-`static/index.html` + `static/app.js` + `static/chat.css` 当前负责：
+### 9.1 触发逻辑
 
-- 聊天页 UI
-- SSE 消息流接收
-- 流式更新节流
-- 最新回复重新生成
-- 背景图切换与本地缓存
-- char卡片拖动与位置缓存
-- 聊天气泡富文本渲染
-- 动作括号格式处理
+- 触发文本来源：最近 4 条历史消息 + 当前输入
+- 命中规则：`keywords` 中任一关键词命中
+- `always: true` 条目始终注入
 
-### 10.2 设置页前端
+### 9.2 注入格式
 
-`static/settings.html` + `static/settings.js` + `static/styles.css` 当前负责：
+命中条目会转换成：
 
-- 人格配置表单
-- 世界书表单编辑
-- Ollama 服务地址切换
-- 当前模型切换
-- 运行状态显示
-- 清空历史与记忆
-- 跳转记忆页
+```text
+- 标题: 内容
+```
 
-### 10.3 记忆页前端
+然后整体进入系统提示词的 `【世界书】` 段落。
 
-`static/memories.html` + `static/memories.js` 当前负责：
+### 9.3 当前边界
 
-- 拉取 `/api/memories`
-- 以卡片形式展示长期记忆
-- 刷新当前记忆列表
+- 仍是简单关键词匹配
+- 不做向量召回
+- 不做复杂优先级系统
+- 手工替换世界书文件时，系统不会帮你做差量合并；当前策略是以最新文件内容为准
 
 ---
 
-## 11. 当前 API 列表
+## 10. 记忆系统设计
 
-### 11.1 页面路由
+### 10.1 记忆类型
 
-| 路由 | 方法 | 说明 |
-| --- | --- | --- |
-| `/` | `GET` | 聊天页 |
-| `/settings` | `GET` | 设置页 |
-| `/memories` | `GET` | 记忆查看页 |
+当前记忆分为两类：
 
-### 11.2 数据与配置接口
+- `persistent`
+  - 用户名称 / 称呼
+  - 所在地 / 来源
+  - 偏好 / 厌恶
+  - 习惯 / 计划
+  - 关系设定 / 互动边界
+- `session`
+  - 当前衣着
+  - 当前动作
+  - 当前场景
+  - 当前状态
+  - 用户当前动作态
 
-| 路由 | 方法 | 说明 |
-| --- | --- | --- |
-| `/api/bootstrap` | `GET` | 返回页面初始化所需的全部数据 |
-| `/api/health` | `GET` | 返回运行状态、模型状态、记忆状态 |
-| `/api/history` | `GET` | 获取历史消息 |
-| `/api/history` | `DELETE` | 清空历史消息 |
-| `/api/memory` | `DELETE` | 清空记忆库 |
-| `/api/memories` | `GET` | 获取长期记忆列表 |
-| `/api/config/soul` | `GET` | 获取人格配置 |
-| `/api/config/soul` | `PUT` | 更新人格配置 |
-| `/api/config/worldbook` | `GET` | 获取世界书 |
-| `/api/config/worldbook` | `PUT` | 更新世界书 |
-| `/api/runtime/model` | `PUT` | 更新当前模型 |
-| `/api/runtime/base-url` | `PUT` | 更新 Ollama 服务地址 |
+### 10.2 提取方式
 
-### 11.3 聊天接口
+当前使用“LLM 提取 + 规则兜底”混合方案：
 
-| 路由 | 方法 | 说明 |
-| --- | --- | --- |
-| `/api/chat/stream` | `POST` | 正常聊天的 SSE 流式接口 |
-| `/api/chat/regenerate` | `POST` | 重新生成最新回复的 SSE 流式接口 |
+1. 将最近对话和当前轮内容送入记忆提取提示词
+2. 优先尝试结构化 JSON 提取
+3. 失败时退回规则提取
+4. 对候选记忆做标准化、过滤和压缩
 
-### 11.4 运行状态字段
+### 10.3 写入与合并
 
-`/api/health` 与 `/api/bootstrap.runtime` 当前返回：
+当前写入机制包括：
+
+- 整轮内容先做 hash 去重
+- 长期记忆按稳定 `key` 合并
+- 会话记忆按槽位覆盖
+- 每条记忆记录 `turn_id`
+- 每条记忆保留 `turn_index`、`confidence`、`source_turn_ids`
+- session 记忆会做新鲜度控制和过期失活
+
+### 10.4 删除与回滚
+
+当前已实现：
+
+- 清空整库 `DELETE /api/memory`
+- 删除单条记忆 `DELETE /api/memories/{memory_id}`
+- 删除整轮对话时同步移除记忆引用
+- 重新生成失败时恢复原轮次和原记忆
+
+### 10.5 当前边界
+
+- 会话记忆仍是轻量状态管理，不是完整状态机
+- 旧版本遗留记忆若缺少足够 revision 信息，回滚精度会差于新写入数据
+- 结构化提取偶尔失败时会自动降级到规则模式
+
+---
+
+## 11. 运行时模型与状态
+
+当前统一支持两类 Provider：
+
+### 11.1 Ollama
+
+使用：
+
+- `/api/tags`
+- `/api/chat`
+- `/api/embeddings`
+- `/api/embed`
+
+### 11.2 OpenAI-compatible
+
+使用：
+
+- `/models`
+- `/chat/completions`
+- `/embeddings`
+
+### 11.3 运行时状态字段
+
+`/api/bootstrap` 与 `/api/health` 当前返回的运行时字段包括：
 
 - `healthy`
 - `error`
+- `provider`
+- `provider_label`
 - `models`
 - `current_model`
 - `memory_count`
 - `memory_error`
 - `embed_model`
 - `base_url`
+- `api_key_configured`
+- `api_key_masked`
 
 ---
 
-## 12. 部署与运行
+## 12. 前端状态与本地存储
 
-### 12.1 本地运行
+当前前端会在浏览器本地保存这些状态：
 
-安装依赖：
+- 聊天页背景 URL：`aura-live.background-url`
+- 悬浮立绘偏移量：`aura-live.pet-offset`
+- 记忆页筛选条件：`aura-live.memories-filters`
 
-```bash
-pip install -r requirements.txt
-```
+这些状态只影响当前浏览器体验，不参与后端持久化。
 
-准备模型：
+补充说明：
 
-```bash
-ollama pull Gemma4:e4b
-ollama pull bge-m3
-```
+- 立绘当前是无边框悬浮展示，不再显示底部名称文字
+- 拖动绑定在整张立绘区域，而不是单独的拖拽把手
+- 立绘的呼吸感和光晕完全由前端样式实现，不影响后端数据结构
 
-启动服务：
+---
+
+## 13. API 清单
+
+### 13.1 页面路由
+
+- `GET /`
+- `GET /settings`
+- `GET /memories`
+
+### 13.2 基础与历史
+
+- `GET /api/bootstrap`
+- `GET /api/health`
+- `GET /api/history`
+- `DELETE /api/history`
+- `DELETE /api/history/turn`
+
+### 13.3 记忆相关
+
+- `DELETE /api/memory`
+- `GET /api/memories`
+- `DELETE /api/memories/{memory_id}`
+
+### 13.4 角色与世界书
+
+- `GET /api/config/soul`
+- `PUT /api/config/soul`
+- `POST /api/assets/avatar`
+- `GET /api/config/worldbook`
+- `PUT /api/config/worldbook`
+
+### 13.5 运行时配置
+
+- `PUT /api/runtime/model`
+- `PUT /api/runtime/base-url`
+- `PUT /api/runtime/config`
+
+### 13.6 聊天
+
+- `POST /api/chat/stream`
+- `POST /api/chat/regenerate`
+
+说明：
+
+- 两个聊天接口都使用 SSE
+- 当前前端会处理 `status`、`chunk`、`done`、`error` 这四类事件
+
+---
+
+## 14. 部署方式与当前假设
+
+### 14.1 本地运行
 
 ```bash
 uvicorn app:app --host 0.0.0.0 --port 8501
 ```
 
-访问地址：
-
-```text
-http://127.0.0.1:8501
-```
-
-### 12.2 NAS / Docker Compose
-
-当前默认 NAS 目标参数：
-
-- NAS IP：`192.168.50.51`
-- 应用端口：`8501`
-- Ollama 端口：`11434`
-- 默认聊天模型：`Gemma4:e4b`
-- 默认嵌入模型：`bge-m3`
-- 目标目录：`/vol1/1000/docker/ai_pet`
-
-当前 `docker-compose.yml` 中的核心环境变量：
-
-```yaml
-environment:
-  OLLAMA_BASE_URL: "http://192.168.50.51:11434"
-  DEFAULT_MODEL: "Gemma4:e4b"
-  EMBED_MODEL: "bge-m3"
-  APP_TITLE: "AURA Live"
-  REQUEST_TIMEOUT: "60"
-```
-
-部署命令：
+### 14.2 Docker
 
 ```bash
-cd /vol1/1000/docker/ai_pet
+docker build -t aura-live:latest .
+docker run -d --name aura-live -p 8501:8501 aura-live:latest
+```
+
+### 14.3 Docker Compose
+
+当前仓库自带 `docker-compose.yml`，内容体现的是 NAS 单机部署假设：
+
+- 构建上下文：`/vol1/1000/docker/ai_pet`
+- 挂载目录：`/vol1/1000/docker/ai_pet:/app`
+- 映射端口：`8501:8501`
+
+直接运行：
+
+```bash
 docker compose up -d --build
 ```
 
-容器启动命令由 `Dockerfile` 中的 `uvicorn app:app --host 0.0.0.0 --port 8501` 提供。
+### 14.4 当前部署边界
 
-### 12.3 持久化目录
+当前代码和文档都按“单用户、本地 / NAS、仓库内文件直接持久化”来设计。
 
-以下路径需要保存在挂载卷中：
+因此当前没有专门处理：
 
-- `/app/soul.json`
-- `/app/worldbook.json`
-- `/app/history.json`
-- `/app/memory.json`
-- `/app/runtime.json`
-- `/app/avatars/`
-- `/app/chroma_db/`
+- 相对路径移植
+- 可配置卷抽象
+- 多环境部署模板
 
----
+如果 NAS 上的工作目录发生变化，需要手动修改 `docker-compose.yml` 里的绝对路径绑定；当前不会自动推导或转换。
 
-## 13. 当前使用约束
+持久化时至少应保留：
 
-### 13.1 Ollama 依赖
-
-聊天和记忆都依赖 Ollama，但依赖点不同：
-
-- 聊天依赖 `DEFAULT_MODEL`
-- 记忆依赖 `EMBED_MODEL`
-
-如果只安装了聊天模型而没有安装嵌入模型：
-
-- 聊天可以正常工作
-- 记忆不会写入
-- `memory_count` 不会增长
-- `memory_error` 会反映错误信息
-
-### 13.2 部署边界
-
-当前版本的目标部署场景是：
-
-- 本地设备
-- 局域网
-- 单用户或家庭环境
-
-不建议直接裸露到公网。
+- `soul.json`
+- `worldbook.json`
+- `history.json`
+- `memory.json`
+- `runtime.json`
+- `avatars/`
+- `chroma_db/`
 
 ---
 
-## 14. 常见问题
+## 15. 测试与验证资产
 
-### 14.1 聊天正常，但记忆一直是 0
+当前仓库已经包含最小回归测试文件：
 
-最常见原因是嵌入模型不存在。当前默认嵌入模型是：
+- `tests/test_chat_service_turn_management.py`
 
-```bash
-bge-m3
-```
+目前覆盖的核心场景：
 
-确认是否已安装：
+- 删除整轮对话时历史和记忆引用同步变化
+- 重新生成失败后的原轮次恢复
+- 系统提示词包含连续性约束
+- 最近重复动作在最终保存历史时会被抑制
 
-```bash
-curl http://192.168.50.51:11434/api/tags
-```
-
-如果未安装，执行：
+推荐执行方式：
 
 ```bash
-ollama pull bge-m3
+python -m unittest discover -s tests
 ```
 
-### 14.2 页面能打开，但无法聊天
-
-通常是 `OLLAMA_BASE_URL` 不可达，先检查：
+前端脚本可用：
 
 ```bash
-curl http://192.168.50.51:11434/api/tags
+node --check static/app.js
+node --check static/memories.js
+node --check static/settings.js
 ```
 
-### 14.3 为什么动作描写会变成第三人称
+当前仓库没有 CI，也没有端到端自动化测试。
 
-这是当前实现规则。括号内动作、神态、环境描写会被统一规范为第三人称，以保持char叙述视角一致。
+---
 
-### 14.4 真正的长期记忆在哪里看
+## 16. 当前适用场景
 
-现在可以直接访问：
+当前版本适合：
 
-```text
-/memories
-```
+- 单用户本地陪伴式聊天
+- 长期角色扮演 / 角色伴聊
+- NAS 常驻部署
+- 基于世界书和记忆系统的持续设定演化
 
-底层存储仍在 `chroma_db/`，但日常查看不再需要手动翻数据库文件。
+当前版本不面向：
+
+- 多用户系统
+- 公网高并发服务
+- 严格权限管理 SaaS
+- 通用工作流自动化平台
+
+---
+
+## 17. 文档说明
+
+本文档只描述当前仓库中已经实现的真实能力。  
+后续如果继续迭代，应继续以代码现状为准同步更新，不保留已废弃设计，不提前写未落地路线图。
