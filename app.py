@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterator
@@ -17,6 +19,8 @@ from utils.exceptions import AURAPetError, ValidationError
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"}
+MAX_AVATAR_BYTES = 8 * 1024 * 1024
 
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 config.files.avatars_dir.mkdir(parents=True, exist_ok=True)
@@ -47,6 +51,19 @@ class BaseUrlPayload(BaseModel):
     base_url: str = Field(..., min_length=1, max_length=255)
 
 
+class RuntimeConfigPayload(BaseModel):
+    provider: str | None = Field(default=None, max_length=40)
+    base_url: str | None = Field(default=None, max_length=255)
+    api_key: str | None = Field(default=None, max_length=400)
+    current_model: str | None = Field(default=None, max_length=120)
+    embed_model: str | None = Field(default=None, max_length=120)
+
+
+class AvatarUploadPayload(BaseModel):
+    filename: str = Field(..., min_length=1, max_length=255)
+    content_base64: str = Field(..., min_length=1)
+
+
 class RegenerateRequest(BaseModel):
     model: str | None = Field(default=None)
 
@@ -61,7 +78,33 @@ def get_chat_service() -> ChatService:
     return ChatService(config)
 
 
+def get_provider_label(provider: str) -> str:
+    return "在线兼容接口" if provider == "openai_compatible" else "Ollama"
+
+
+def mask_api_key(api_key: str) -> str:
+    key = api_key.strip()
+    if len(key) <= 8:
+        return "*" * len(key)
+    return f"{key[:4]}{'*' * max(4, len(key) - 8)}{key[-4:]}"
+
+
+def get_provider_label(provider: str) -> str:
+    return "在线兼容接口" if provider == "openai_compatible" else "Ollama"
+
+
+def sanitize_avatar_filename(filename: str) -> str:
+    path = Path(filename)
+    suffix = path.suffix.lower()
+    if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+        raise ValidationError("头像格式不受支持。请上传 png、jpg、jpeg、webp、gif 或 avif。")
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", path.stem).strip("._") or "avatar"
+    return f"{stem}{suffix}"
+
+
 def get_runtime_state(service: ChatService) -> dict[str, Any]:
+    runtime_settings = service.load_runtime_settings()
+    provider = service.llm.config.provider
     try:
         models = service.get_available_models()
         healthy = True
@@ -70,18 +113,25 @@ def get_runtime_state(service: ChatService) -> dict[str, Any]:
         models = []
         healthy = False
         error = str(exc)
+
     current_model = service.current_model
     if not current_model and models:
         current_model = models[0]
+
+    api_key = runtime_settings.get("api_key", "").strip()
     return {
         "healthy": healthy,
         "error": error,
+        "provider": provider,
+        "provider_label": get_provider_label(provider),
         "models": models,
         "current_model": current_model,
         "memory_count": service.get_memory_count(),
         "memory_error": service.get_memory_error(),
         "embed_model": service.llm.config.embed_model,
         "base_url": service.llm.config.base_url,
+        "api_key_configured": bool(api_key),
+        "api_key_masked": mask_api_key(api_key) if api_key else "",
     }
 
 
@@ -150,6 +200,16 @@ def clear_history() -> dict[str, Any]:
     return {"history": []}
 
 
+@app.delete("/api/history/turn")
+def delete_history_turn(turn_id: str = "", turn_index: int = 0) -> dict[str, Any]:
+    service = get_chat_service()
+    service.delete_turn(turn_id=turn_id, turn_index=turn_index)
+    return {
+        "history": service.get_conversation_history(),
+        "memory_count": service.get_memory_count(),
+    }
+
+
 @app.delete("/api/memory")
 def clear_memory() -> dict[str, Any]:
     service = get_chat_service()
@@ -166,6 +226,13 @@ def memories() -> dict[str, Any]:
     }
 
 
+@app.delete("/api/memories/{memory_id}")
+def delete_memory_item(memory_id: str) -> dict[str, Any]:
+    service = get_chat_service()
+    service.delete_memory(memory_id)
+    return {"memory_count": service.get_memory_count()}
+
+
 @app.get("/api/config/soul")
 def get_soul() -> dict[str, Any]:
     service = get_chat_service()
@@ -179,6 +246,23 @@ def update_soul(payload: SoulPayload) -> dict[str, Any]:
     return {"soul": soul}
 
 
+@app.post("/api/assets/avatar")
+def upload_avatar(payload: AvatarUploadPayload) -> dict[str, str]:
+    filename = sanitize_avatar_filename(payload.filename)
+    try:
+        binary = base64.b64decode(payload.content_base64, validate=True)
+    except Exception as exc:
+        raise ValidationError("头像上传内容无效。") from exc
+    if not binary:
+        raise ValidationError("头像内容不能为空。")
+    if len(binary) > MAX_AVATAR_BYTES:
+        raise ValidationError("头像文件过大，请控制在 8MB 以内。")
+
+    target_path = config.files.avatars_dir / filename
+    target_path.write_bytes(binary)
+    return {"filename": filename, "url": f"/avatars/{filename}"}
+
+
 @app.get("/api/config/worldbook")
 def get_worldbook() -> dict[str, Any]:
     service = get_chat_service()
@@ -188,7 +272,7 @@ def get_worldbook() -> dict[str, Any]:
 @app.put("/api/config/worldbook")
 def update_worldbook(payload: WorldbookPayload) -> dict[str, Any]:
     service = get_chat_service()
-    worldbook = service.save_worldbook(payload.entries)
+    worldbook = service.save_worldbook({"entries": payload.entries})
     return {"worldbook": worldbook}
 
 
@@ -203,6 +287,13 @@ def update_runtime_model(payload: ModelPayload) -> dict[str, Any]:
 def update_runtime_base_url(payload: BaseUrlPayload) -> dict[str, Any]:
     service = get_chat_service()
     service.set_base_url(payload.base_url)
+    return get_runtime_state(service)
+
+
+@app.put("/api/runtime/config")
+def update_runtime_config(payload: RuntimeConfigPayload) -> dict[str, Any]:
+    service = get_chat_service()
+    service.update_runtime_settings(payload.model_dump())
     return get_runtime_state(service)
 
 
@@ -272,3 +363,7 @@ def chat_regenerate(payload: RegenerateRequest) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+def get_provider_label(provider: str) -> str:
+    return "\u5728\u7ebf\u517c\u5bb9\u63a5\u53e3" if provider == "openai_compatible" else "Ollama"

@@ -1,4 +1,7 @@
 {
+  "provider": "ollama",
   "base_url": "http://192.168.50.51:11434",
-  "current_model": "Gemma4:e4b"
+  "api_key": "",
+  "current_model": "Gemma4:e4b",
+  "embed_model": "bge-m3"
 }

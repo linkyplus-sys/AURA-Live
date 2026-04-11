@@ -30,7 +30,9 @@ def _get_env_float(name: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class OllamaConfig:
+    provider: str
     base_url: str
+    api_key: str
     embed_model: str
     default_model: str
     request_timeout: int
@@ -68,9 +70,15 @@ class AppConfig:
 
 def load_config() -> AppConfig:
     ollama = OllamaConfig(
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://192.168.50.51:11434").rstrip("/"),
-        embed_model=os.getenv("EMBED_MODEL", "bge-m3"),
-        default_model=os.getenv("DEFAULT_MODEL", "Gemma4:e4b").strip(),
+        provider=os.getenv("LLM_PROVIDER", "ollama").strip() or "ollama",
+        base_url=(
+            os.getenv("LLM_BASE_URL")
+            or os.getenv("OLLAMA_BASE_URL")
+            or "http://192.168.50.51:11434"
+        ).rstrip("/"),
+        api_key=os.getenv("LLM_API_KEY", "").strip(),
+        embed_model=(os.getenv("LLM_EMBED_MODEL") or os.getenv("EMBED_MODEL") or "bge-m3").strip(),
+        default_model=(os.getenv("CHAT_MODEL") or os.getenv("DEFAULT_MODEL") or "Gemma4:e4b").strip(),
         request_timeout=_get_env_int("REQUEST_TIMEOUT", 60),
         max_retries=_get_env_int("MAX_RETRIES", 3),
         retry_delay=_get_env_float("RETRY_DELAY", 1.0),
